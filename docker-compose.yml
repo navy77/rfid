@@ -1,0 +1,45 @@
+
+services:
+  rfid_app:
+    build:
+      context: .  
+      dockerfile: Dockerfile
+    environment:
+      - TZ=Asia/Bangkok
+    image: "mic/rfid_app:1.0.0"
+    container_name: rfid_app
+    privileged: true
+    volumes:
+      - ./.env:/app/.env
+    command: ["python", "main.py"]
+    restart: always
+
+  get_status:
+    image: "mic/rfid_app:1.0.0"
+    container_name: get_status
+    privileged: true
+    volumes:
+      - ./.env:/app/.env
+    environment:
+      - TZ=Asia/Bangkok
+    command: ["python", "get_status.py"]
+    
+  api_demo:
+    image: "mic/rfid_app:1.0.0"
+    container_name: 'api_demo'
+    privileged: true
+    environment:
+      - TZ=Asia/Bangkok
+    command: ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  ofelia:
+    image: mcuadros/ofelia:latest
+    privileged: true
+    container_name: 'ofelia'
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./config.ini:/etc/ofelia/config.ini
+  
+
+
