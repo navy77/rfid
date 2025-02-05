@@ -3,4 +3,4 @@ paho-mqtt==1.6.1
 pandas>=2.1.0
 pymssql==2.2.10
 fastapi==0.111.1
-
+requests

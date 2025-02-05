@@ -24,8 +24,6 @@ sql_database = os.getenv('SQL_DATABASE')
 sql_table = os.getenv('SQL_TABLE')
 sql_table_loc = os.getenv('SQL_TABLE_LOC')
 
-
-
 url = os.getenv('URL_1')
 
 def on_connect(client, userdata, flags, rc):
@@ -66,7 +64,6 @@ def on_message(client, userdata, msg):
         print('Request was successful.')
         print('Response:', response.json())
         job_data = response.json()['data']
-        print(job_data)
         insert_sql(job_data,rfid_data,req_code,status_init,position_code_1,position_code_2)
     else:
         print(f'Failed with status code: {response.status_code}')

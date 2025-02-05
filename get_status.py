@@ -18,7 +18,7 @@ def query_mssql():
     try:
         conn = pymssql.connect(server=sql_server, user=sql_username, password=sql_password, database=sql_database)
         cursor = conn.cursor()
-        query = f"""SELECT * FROM {sql_table} where status !='0'"""
+        query = f"""SELECT * FROM {sql_table} where status !='0'"""  # 0= success
         cursor.execute(query)
         results = cursor.fetchall()
         columns = [col[0] for col in cursor.description]
