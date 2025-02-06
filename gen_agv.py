@@ -4,12 +4,11 @@ import os
 from dotenv import load_dotenv
 import requests
 import pandas as pd
-import datetime
+from datetime import datetime
 from dotenv import load_dotenv,set_key
 from pathlib import Path
 import pymssql
 import random
-
 
 load_dotenv()
 
@@ -33,18 +32,22 @@ def on_connect(client, userdata, flags, rc):
 def on_message(client, userdata, msg):
     payload = json.loads(msg.payload.decode('utf-8'))
 
-    # param
-    req_code =  f'req_{random.randint(100,10000)}' #### need generate
     rfid_data = payload["rfid"]
+    run(rfid_data)
+
+def genAgvSchedulingTask(reqCode,rfid_data,location2):
+
     status_init = 99
     position_code_1 = os.getenv("POSITIONCODE_1")
-    position_code_2 = str(query_location(rfid_data))
+    position_code_2 = location2
+
     tasktyp = os.getenv("TASKTYP")
     type1 = os.getenv("TYPE_1")
     type2 = os.getenv("TYPE_2")
     map_code = os.getenv("MAPCODE")
+    map_short_name = os.getenv("MAPShortName")
 
-    agv_cmd = {"reqCode":f'{req_code}',
+    cmd_json = {"reqCode":f'{reqCode}',
     "taskTyp":f'{tasktyp}',
     "positionCodePath":[{
         "positionCode": f'{position_code_1}',
@@ -54,32 +57,56 @@ def on_message(client, userdata, msg):
         "positionCode": f'{position_code_2}',
         "type": f'{type2}'
     }],
-        "mapCode":f'{map_code}'
+        "mapCode":f'{map_code}',
+        "mapShortName":f'{map_short_name}'
     }
-    agv_cmd_json = json.dumps(agv_cmd)
-    print(agv_cmd_json)
-    response = requests.post(url, json=agv_cmd_json)
+    # cmd_json = json.dumps(cmd_json)
+    # print(cmd_json)
+    url = os.getenv("URL_2")
+    response = requests.post(url, json=cmd_json)
 
     if response.status_code == 200:
-        print('Request was successful.')
+        print('Request agvgen successful.')
         print('Response:', response.json())
         job_data = response.json()['data']
-        insert_sql(job_data,rfid_data,req_code,status_init,position_code_1,position_code_2)
+
+        insert_sql(job_data,rfid_data,reqCode,status_init,position_code_1,position_code_2)
+
     else:
         print(f'Failed with status code: {response.status_code}')
         print('Response:', response.text)
+
+def bindCtnrAndBin(reqCode,stgbincode):
+    url = os.getenv("URL_1")
+    cmd_json = {
+    "reqCode":reqCode,
+    "ctnrTyp": os.getenv("CTNRTYP"),
+    "stgBinCode": stgbincode,
+    "indBind": os.getenv("INDBIND")
+    }
+
+    response = requests.post(url, json=cmd_json)
+    if response.status_code == 200:
+        print('Request bindctnr successful.')
+        return 1
+    else:
+        print(f'Failed status code: {response.status_code}')
+        print('Response:', response.text)
+        return 0
 
 def query_location(rfid):
     try:
         conn = pymssql.connect(server=sql_server, user=sql_username, password=sql_password, database=sql_database)
         cursor = conn.cursor()
-        query = f"""SELECT * FROM {sql_table_loc} where rfid_tag ='{rfid}'"""
+        query = f"""SELECT * FROM {sql_table_loc} where rfid_code ='{rfid}'"""
         cursor.execute(query)
         results = cursor.fetchall()
         columns = [col[0] for col in cursor.description]
         df = pd.DataFrame(results, columns=columns)
-        location = df['loc_wh'].values[0]
-        return location
+        location = df['location_name'].values[0]
+        stgbincode = df['stgbin_code'].values[0]
+
+        return location,stgbincode
 
     except pymssql.DatabaseError as e:
         print("Database error:", e)
@@ -93,9 +120,10 @@ def insert_sql(job_data,rfid_data,req_code,status,loc_1,loc_2):
         conn = pymssql.connect(server=sql_server, user=sql_username, password=sql_password, database=sql_database)
         cursor = conn.cursor()
         query = f"""INSERT INTO {sql_table} (job_data, rfid_data,req_code ,status,loc_1,loc_2,register) VALUES (%s, %s, %s, %s,%s, %s,GETDATE())"""
+        print(query)
         cursor.execute(query, (job_data,rfid_data,req_code,status,loc_1,loc_2))
         conn.commit() 
-        print("Inserted successfully")
+        print("Inserted successful")
     
     except pymssql.DatabaseError as e:
         print("Database error:", e)
@@ -103,6 +131,16 @@ def insert_sql(job_data,rfid_data,req_code,status,loc_1,loc_2):
     finally:
         cursor.close()
         conn.close()
+
+def run(rfid_data):
+    req_code = f'r_{datetime.now().strftime("%Y%m%d%H%M%S")}'
+
+    stgbincode = os.getenv("STGBINCODE")
+    bind_status = bindCtnrAndBin(req_code,stgbincode)
+    location2,stgbincode = query_location(rfid_data)
+
+    if bind_status==1:
+        genAgvSchedulingTask(req_code,rfid_data,location2)
 
 def main():
     client = mqtt.Client()

@@ -6,7 +6,7 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
-url = os.getenv('URL_2')
+url = os.getenv('URL_3')
 
 sql_server = os.getenv('SQL_SERVER')
 sql_username = os.getenv('SQL_USERNAME')
